@@ -1,0 +1,55 @@
+
+def mock_tavily_search(query: str) -> str:
+    return f"""
+    🔹 Simulated Web Results for: "{query}"
+
+    - Source 1: "{query}" is currently gaining attention in academic and policy circles, with numerous initiatives underway in 2025.
+    - Source 2: Recent developments show that organizations are adopting new frameworks and tools to improve outcomes related to "{query}".
+    - Source 3: Experts emphasize the need for ethical guidelines and regulatory oversight in areas impacted by "{query}".
+    - Source 4: Startups and tech giants alike are investing heavily in innovations concerning "{query}".
+    - Source 5: Analysts predict major shifts in global trends due to the implications of "{query}" by the end of 2025.
+    """
+
+def mock_answer_agent_fn(research_notes: str, query: str) -> str:
+    return f""" Answer to: "{query}"
+
+ Based on simulated research:
+{research_notes.strip()}
+
+Summary:
+- Multiple sources point to active developments and interest in this area.
+- The topic of "{query}" is significant in 2025, with ethical, technical, and global dimensions.
+- Use this draft as a base for deeper analysis or reporting.
+"""
+def research_node(state):
+    print("ResearchAgent is gathering online information...")
+    notes = mock_tavily_search(state["query"])
+    return {"research_notes": notes}
+
+def answer_node(state):
+    print(" AnswerAgent is drafting a detailed summary...")
+    final = mock_answer_agent_fn(state["research_notes"], state["query"])
+    return {"final_answer": final}
+def run_deep_research(query: str):
+    state = {
+        "query": query,
+        "research_notes": "",
+        "final_answer": ""
+    }
+
+   
+    research_output = research_node(state)
+    state.update(research_output)
+
+    
+    answer_output = answer_node(state)
+    state.update(answer_output)
+
+    return state["final_answer"]
+
+query = "AI in agriculture 2025"
+result = run_deep_research(query)
+
+print("\n Final Response:\n")
+print(result)
+
