@@ -1,55 +1,86 @@
+import requests
+from typing import List, Optional, Dict
+from pydantic import BaseModel, Field
 
-def mock_tavily_search(query: str) -> str:
-    return f"""
-    🔹 Simulated Web Results for: "{query}"
+# SerpAPI Key and endpoint setup
+SERPAPI_API_KEY = '5cc1af4ce4a51962a95d1e828cebc62689283f843e569f97cfe278ececedfb1f'  
+SERPAPI_URL = "https://serpapi.com/search"
 
-    - Source 1: "{query}" is currently gaining attention in academic and policy circles, with numerous initiatives underway in 2025.
-    - Source 2: Recent developments show that organizations are adopting new frameworks and tools to improve outcomes related to "{query}".
-    - Source 3: Experts emphasize the need for ethical guidelines and regulatory oversight in areas impacted by "{query}".
-    - Source 4: Startups and tech giants alike are investing heavily in innovations concerning "{query}".
-    - Source 5: Analysts predict major shifts in global trends due to the implications of "{query}" by the end of 2025.
-    """
+# --- Web Search Utility using SerpAPI ---
 
-def mock_answer_agent_fn(research_notes: str, query: str) -> str:
-    return f""" Answer to: "{query}"
-
- Based on simulated research:
-{research_notes.strip()}
-
-Summary:
-- Multiple sources point to active developments and interest in this area.
-- The topic of "{query}" is significant in 2025, with ethical, technical, and global dimensions.
-- Use this draft as a base for deeper analysis or reporting.
-"""
-def research_node(state):
-    print("ResearchAgent is gathering online information...")
-    notes = mock_tavily_search(state["query"])
-    return {"research_notes": notes}
-
-def answer_node(state):
-    print(" AnswerAgent is drafting a detailed summary...")
-    final = mock_answer_agent_fn(state["research_notes"], state["query"])
-    return {"final_answer": final}
-def run_deep_research(query: str):
-    state = {
-        "query": query,
-        "research_notes": "",
-        "final_answer": ""
+def search_web(query: str, num_results: int = 5):
+    print(f"Searching the web for query: '{query}' ...")
+    
+   
+    params = {
+        "q": query,
+        "api_key": SERPAPI_API_KEY,  
+        "num": num_results
     }
+    
+   
+    response = requests.get(SERPAPI_URL, params=params)
+    
+    if response.status_code == 200:
+        data = response.json()
+        search_results = []
+        
+        for idx, result in enumerate(data.get("organic_results", []), 1):
+            search_results.append({
+                "title": result.get("title", f"Result {idx}"),
+                "url": result.get("link", ""),
+                "content": result.get("snippet", f"This is a snippet from result {idx}.")
+            })
+        
+        return search_results
+    else:
+        print("Error fetching search results")
+        return []
+
+
+def researcher_agent(state):
+    query = state.query
+    print(f"[Researcher Agent] Searching for: {query}")
+    research_data = search_web(query)
+    state.research_data = research_data
+    return state  
+
+
+
+def drafter_agent(state):
+    research_data = state.research_data
+    print("[Drafter Agent] Drafting answer based on research data...")
+
+    if not research_data:
+        state.draft_answer = "No sufficient data found to generate an answer."
+    else:
+        summary = "Here is the research summary based on the gathered sources:\n\n"
+        for idx, item in enumerate(research_data, 1):
+            summary += f"{idx}. {item['title']} - {item['url']}\n"
+            summary += f"Snippet: {item['content']}\n\n"
+        state.draft_answer = summary  
+    return state  
+
+
+class ResearchState(BaseModel):
+    query: str
+    research_data: Optional[List[Dict]] = Field(default=None)
+    draft_answer: Optional[str] = Field(default=None)
+
+
+def main():
+    query = input("Enter your research query: ")
 
    
-    research_output = research_node(state)
-    state.update(research_output)
+    initial_state = ResearchState(query=query)
 
     
-    answer_output = answer_node(state)
-    state.update(answer_output)
+    state_after_research = researcher_agent(initial_state)
 
-    return state["final_answer"]
+    final_state = drafter_agent(state_after_research)
 
-query = "AI in agriculture 2025"
-result = run_deep_research(query)
+    print("\n\n=== Final Drafted Answer ===")
+    print(final_state.draft_answer)
 
-print("\n Final Response:\n")
-print(result)
-
+if __name__ == "__main__":
+    main()
